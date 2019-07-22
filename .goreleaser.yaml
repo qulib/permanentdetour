@@ -1,8 +1,7 @@
 builds:
-  - 
-   goos: 
+  -
+   goos:
      - freebsd
-     - windows
      - linux
      - darwin
    goarch:
@@ -15,12 +14,9 @@ builds:
      - 7
 archive:
   replacements:
-    darwin: macOS 
+    darwin: macOS
     amd64: x86_64
   wrap_in_directory: true
-  format_overrides:
-    - goos: windows
-      format: zip
 checksum:
   name_template: 'checksums.txt'
 snapshot:

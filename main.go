@@ -48,7 +48,7 @@ type Detourer struct {
 
 // The Detourer serves HTTP redirects based on the request.
 func (d Detourer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	redirectTo := d.primoaddress
+	redirectTo := fmt.Sprintf("%vdiscovery/search?vid=%v", d.primoaddress, d.vid)
 	if strings.HasPrefix(r.URL.Path, RecordURLPrefix) {
 		pathBibID := r.URL.Path[len(RecordURLPrefix):]
 		if len(pathBibID) <= d.maxBibIDLength {

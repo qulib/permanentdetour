@@ -15,7 +15,6 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
-	"regexp"
 	"strconv"
 	"strings"
 	"syscall"
@@ -89,7 +88,7 @@ func (d Detourer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		buildTitleSearchRedirect(redirectTo, r)
 	case strings.HasPrefix(r.URL.Path, AdvancedSearchPrefix):
 		setParamInURL(redirectTo, "mode", "advanced")
-		fallthrough
+		buildSearchRedirect(redirectTo, r)
 	case strings.HasPrefix(r.URL.Path, SearchPrefix):
 		buildSearchRedirect(redirectTo, r)
 	}
@@ -152,29 +151,6 @@ func buildTitleSearchRedirect(redirectTo *url.URL, r *http.Request) {
 func buildSearchRedirect(redirectTo *url.URL, r *http.Request) {
 	q := r.URL.Query()
 
-	if q.Get("searcharg") != "" {
-		switch q.Get("searchtype") {
-		case "t":
-			setParamInURL(redirectTo, "query", fmt.Sprintf("title,contains,%v", q.Get("searcharg")))
-		case "a":
-			setParamInURL(redirectTo, "query", fmt.Sprintf("creator,contains,%v", q.Get("searcharg")))
-		case "d":
-			setParamInURL(redirectTo, "query", fmt.Sprintf("sub,contains,%v", q.Get("searcharg")))
-		case "c":
-			redirectTo.Path = "/discovery/browse"
-			setParamInURL(redirectTo, "browseScope", "callnumber.0")
-			setParamInURL(redirectTo, "browseQuery", q.Get("searcharg"))
-		default:
-			setParamInURL(redirectTo, "query", fmt.Sprintf("any,contains,%v", q.Get("searcharg")))
-		}
-	} else if q.Get("SEARCH") != "" {
-		for _, term := range decodeAdvancedSearch(q.Get("SEARCH")) {
-			addParamInURL(redirectTo, "query", term)
-		}
-	} else {
-		return
-	}
-
 	// Sort
 	switch q.Get("sortdropdown") {
 	case "t":
@@ -211,122 +187,29 @@ func buildSearchRedirect(redirectTo *url.URL, r *http.Request) {
 
 	setParamInURL(redirectTo, "tab", "Everything")
 	setParamInURL(redirectTo, "search_scope", "MyInst_and_CI")
-}
 
-// decodeAdvancedSearch takes an advanced search query and tries to rebuild it as a Primo advanced search.
-func decodeAdvancedSearch(query string) []string {
-
-	terms := []string{}
-
-	rawTerms := splitQueryIntoRawTerms(query)
-
-	for _, rawTerm := range rawTerms {
-		termScope := "any"
-		termBool := "AND"
-		switch {
-		case strings.HasSuffix(strings.ToLower(rawTerm), "and not"):
-			termBool = "NOT"
-			rawTerm = rawTerm[:len(rawTerm)-7]
-		case strings.HasSuffix(strings.ToLower(rawTerm), "and"):
-			rawTerm = rawTerm[:len(rawTerm)-3]
-		case strings.HasSuffix(strings.ToLower(rawTerm), "or"):
-			termBool = "OR"
-			rawTerm = rawTerm[:len(rawTerm)-2]
+	if q.Get("searcharg") != "" {
+		switch q.Get("searchtype") {
+		case "t":
+			setParamInURL(redirectTo, "query", fmt.Sprintf("title,contains,%v", q.Get("searcharg")))
+		case "a":
+			setParamInURL(redirectTo, "query", fmt.Sprintf("creator,contains,%v", q.Get("searcharg")))
+		case "d":
+			setParamInURL(redirectTo, "query", fmt.Sprintf("sub,contains,%v", q.Get("searcharg")))
+		case "c":
+			redirectTo.Path = "/discovery/browse"
+			setParamInURL(redirectTo, "browseScope", "callnumber.0")
+			setParamInURL(redirectTo, "browseQuery", q.Get("searcharg"))
+		case "X":
+			setParamInURL(redirectTo, "mode", "advanced")
+			setParamInURL(redirectTo, "query", fmt.Sprintf("any,contains,%v", q.Get("searcharg")))
+		default:
+			setParamInURL(redirectTo, "query", fmt.Sprintf("any,contains,%v", q.Get("searcharg")))
 		}
-
-		switch {
-		case strings.Contains(rawTerm, "t:("):
-			termScope = "title"
-			rawTerm = strings.ReplaceAll(rawTerm, "t:(", "")
-		case strings.Contains(rawTerm, "a:("):
-			termScope = "creator"
-			rawTerm = strings.ReplaceAll(rawTerm, "a:(", "")
-		case strings.Contains(rawTerm, "d:("):
-			termScope = "sub"
-			rawTerm = strings.ReplaceAll(rawTerm, "d:(", "")
-		}
-
-		rawTerm = strings.ReplaceAll(rawTerm, "(", "")
-		rawTerm = strings.ReplaceAll(rawTerm, ")", "")
-		rawTerm = strings.TrimSpace(rawTerm)
-		if rawTerm != "" {
-			terms = append(terms, fmt.Sprintf("%v,contains,%v,%v", termScope, rawTerm, termBool))
-		}
+	} else if q.Get("SEARCH") != "" {
+		setParamInURL(redirectTo, "mode", "advanced")
+		setParamInURL(redirectTo, "query", fmt.Sprintf("any,contains,%v", q.Get("SEARCH")))
 	}
-	return terms
-}
-
-// splitQueryIntoRawTerms takes an advanced search query and splits it into the separate "raw" terms.
-func splitQueryIntoRawTerms(query string) []string {
-
-	// 'depth' is a measure of the maximum number of parenthesis that are open when reading through the query.
-	// An assumption is made here: query is 'flat', and that all booleans separating terms are at the same level.
-	// Booleans are searched for depth - 1.
-	// For example: "((spiders) and (snakes))" has a depth of 2, booleans are searched for at depth 1.
-	depth := 0
-	curDepth := 0
-
-	// We keep track of the depth at each index.
-	indexToDepth := map[int]int{}
-
-	for i := 0; i < len(query); i++ {
-		if query[i] == byte('(') {
-			curDepth += 1
-		}
-		if query[i] == byte(')') {
-			curDepth -= 1
-		}
-		if curDepth > depth {
-			depth = curDepth
-		}
-		indexToDepth[i] = curDepth
-	}
-
-	// Bad query, mismatched number of open/closed parameters.
-	if curDepth != 0 {
-		return []string{}
-	}
-
-	// Flat query with only one term.
-	if depth == 0 {
-		return []string{query}
-	}
-
-	// Find the indexes of any booleans
-	re := regexp.MustCompile(`(?i)(and not|and|or)`)
-	matchLocs := re.FindAllIndex([]byte(query), -1)
-	if matchLocs == nil {
-		return []string{query}
-	}
-
-	// If the depth at the boolean location is correct,  record the length of this term.
-	rawTermLengths := []int{}
-	processed := 0
-	for _, loc := range matchLocs {
-		if indexToDepth[loc[0]] == (depth - 1) {
-			termLength := loc[1] - processed
-			rawTermLengths = append(rawTermLengths, termLength)
-			processed += termLength
-		}
-	}
-
-	// If no booleans are found at the right depth, this is a flat query.
-	if len(rawTermLengths) == 0 {
-		return []string{query}
-	}
-
-	// Chunk the query into terms.
-	remainingQuery := query
-	rawTerms := []string{}
-	for _, rawTermLength := range rawTermLengths {
-		if rawTermLength > len(remainingQuery) {
-			return []string{query}
-		}
-		rawTerms = append(rawTerms, strings.TrimSpace(remainingQuery[:rawTermLength]))
-		remainingQuery = remainingQuery[rawTermLength:]
-	}
-	rawTerms = append(rawTerms, strings.TrimSpace(remainingQuery))
-	return rawTerms
 }
 
 func main() {

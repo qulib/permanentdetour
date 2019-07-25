@@ -1,5 +1,5 @@
 # permanentdetour
-A tiny web service which redirects Sierra Web OPAC requests to Primo URLs. 
+A tiny web service which redirects Sierra Web OPAC requests to Primo URLs.
 
 ```
 Permanent Detour: A tiny web service which redirects Sierra Web OPAC requests to Primo URLs.
@@ -22,4 +22,5 @@ The following redirects are supported (with examples in the Carleton context):
 - Patron login. `/patroninfo` is redirected to `https://ocul-crl.primo.exlibrisgroup.com/discovery/login?vid=01OCUL_CRL:CRL_DEFAULT`
 - Author index, call number index, and title search index. `/search/a?SEARCH=twain&sortdropdown=-&searchscope=9` is redirected to `https://ocul-crl.primo.exlibrisgroup.com/discovery/browse?browseQuery=twain&browseScope=author&vid=01OCUL_CRL:CRL_DEFAULT`
 - Searches. `/search/?searchtype=t&SORT=D&searcharg=spiders&searchscope=9&submit=Submit` redirects to `https://ocul-crl.primo.exlibrisgroup.com/discovery/search?query=title,contains,spiders&search_scope=MyInst_and_CI&tab=Everything&vid=01OCUL_CRL:CRL_DEFAULT`
-- Advanced searches. `/search/X?SEARCH=t:("communism%20and")%20and%20t:("red")&SORT=D` redirects to `https://ocul-crl.primo.exlibrisgroup.com/discovery/search?mode=advanced&query=title,contains,%22communism%20and%22,AND&query=title,contains,%22red%22,AND&search_scope=MyInst_and_CI&tab=Everything&vid=01OCUL_CRL:CRL_DEFAULT`
+
+Searches are not automatically translated to Primo syntax. To do so would require lexing and parsing Sierra searches, which is outside the immediate scope of this tool.

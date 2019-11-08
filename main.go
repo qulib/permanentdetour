@@ -79,7 +79,7 @@ func (d Detourer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Depending on the prefix...
 	switch {
 	case strings.HasPrefix(r.URL.Path, RecordPrefix):
-		buildRecordRedirect(redirectTo, r, d.idMap)
+		d.buildRecordRedirect(redirectTo, r)
 	case strings.HasPrefix(r.URL.Path, PatronInfoPrefix):
 		redirectTo.Path = "/discovery/login"
 	case strings.HasPrefix(r.URL.Path, SearchAuthorIndexPrefix):
@@ -103,12 +103,12 @@ func (d Detourer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 // buildRecordRedirect updates redirectTo to the correct Primo record URL for the requested bibID.
-func buildRecordRedirect(redirectTo *url.URL, r *http.Request, idMap map[uint32]uint64) {
+func (d Detourer) buildRecordRedirect(redirectTo *url.URL, r *http.Request) {
 	// Convert everything after the RecordPrefix to a integer.
 	bibID64, err := strconv.ParseUint(r.URL.Path[len(RecordPrefix):], 10, 32)
 	if err == nil {
 		bibID := uint32(bibID64)
-		exlID, present := idMap[bibID]
+		exlID, present := d.idMap[bibID]
 		if present {
 			redirectTo.Path = "/discovery/fulldisplay"
 			setParamInURL(redirectTo, "docid", fmt.Sprintf("alma%v", exlID))

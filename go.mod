@@ -1,5 +1,5 @@
 module github.com/cu-library/permanentdetour
 
-go 1.12
+go 1.13
 
-require github.com/cu-library/overridefromenv v1.0.1
+require github.com/cu-library/overridefromenv v1.2.0

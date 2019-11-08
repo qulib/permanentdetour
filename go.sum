@@ -1,5 +1,7 @@
 github.com/cu-library/overridefromenv v1.0.1 h1:TR7xa2NVTB/5ll9v00As98lY1rffsT/5lJA2+Ui34d0=
 github.com/cu-library/overridefromenv v1.0.1/go.mod h1:+vO3vd5egomjFAPFtOYEHISijYlvHYVk6KVpOfTzHTc=
+github.com/cu-library/overridefromenv v1.2.0 h1:8I2gh3CpJ84kNG8g+iKDTiZZT5tGiVT9Fj2bot755x4=
+github.com/cu-library/overridefromenv v1.2.0/go.mod h1:c4yJoO/ZqKBonD/oGyebon9qSRy42Lm6YXVn9YO+kGw=
 github.com/fatih/color v1.7.0/go.mod h1:Zm6kSWBoL9eyXnKyktHP6abPY2pDugNf5KwzbycvMj4=
 github.com/fogleman/gg v1.3.0/go.mod h1:R/bRT+9gY/C5z7JzPU0zXsXHKM4/ayA+zqcVNZzPa1k=
 github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0/go.mod h1:E/TSTwGwJL78qG/PmXZO1EjYhfJinVAhrmmHX6Z8B9k=

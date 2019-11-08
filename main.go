@@ -35,7 +35,7 @@ const (
 	// MaxMappingFileLength is the maximum number of lines in a mapping file.
 	MaxMappingFileLength uint64 = 1000000
 
-	// RecordURLPrefix is the prefix of the path of requests to III catalogues for the permalink of a record.
+	// RecordPrefix is the prefix of the path of requests to III catalogues for the permalink of a record.
 	RecordPrefix string = "/record=b"
 
 	// PatronInfoPrefix is the prefix of the path of requests to III catalogues for the patron login form.
@@ -44,7 +44,7 @@ const (
 	// SearchAuthorIndexPrefix is the prefix of the path of requests to III catalogues for the author search.
 	SearchAuthorIndexPrefix string = "/search/a"
 
-	// SearchPrefix is the prefix of the path of requests to III catalogues for the call number search.
+	// SearchCallNumberIndexPrefix is the prefix of the path of requests to III catalogues for the call number search.
 	SearchCallNumberIndexPrefix string = "/search/c"
 
 	// SearchTitleIndexPrefix is the prefix of the path of requests to III catalogues for the title search.
@@ -265,7 +265,7 @@ func main() {
 		// Add the mappings from this file to the idMap.
 		err := processFile(d.idMap, mappingFilePath)
 		if err != nil {
-			log.Fatal(err)
+			log.Fatalf("Error processing mapping file: %v.\n", err)
 		}
 	}
 
@@ -308,13 +308,13 @@ func processFile(m map[uint32]uint64, mappingFilePath string) error {
 	// Get the absolute path of the file. Not strictly necessary, but creates clearer error messages.
 	absFilePath, err := filepath.Abs(mappingFilePath)
 	if err != nil {
-		return fmt.Errorf("Could not get absolute path of %v, %v.\n", mappingFilePath, err)
+		return fmt.Errorf("could not get absolute path of %v, %v", mappingFilePath, err)
 	}
 
 	// Open the file for reading. Close the file automatically when done.
 	file, err := os.Open(absFilePath)
 	if err != nil {
-		return fmt.Errorf("Could not open %v for reading, %v.\n", absFilePath, err)
+		return fmt.Errorf("could not open %v for reading, %v", absFilePath, err)
 	}
 	defer file.Close()
 
@@ -322,20 +322,20 @@ func processFile(m map[uint32]uint64, mappingFilePath string) error {
 	scanner := bufio.NewScanner(file)
 	lnum := 0
 	for scanner.Scan() {
-		lnum += 1
+		lnum++
 		bibID, exlID, err := processLine(scanner.Text())
 		if err != nil {
-			return fmt.Errorf("Unable to process line %v '%v', %v.\n", lnum, scanner.Text(), err)
+			return fmt.Errorf("unable to process line %v '%v', %v", lnum, scanner.Text(), err)
 		}
 		_, present := m[bibID]
 		if present {
-			return fmt.Errorf("Previously seen Bib ID %v was encountered.\n", bibID)
+			return fmt.Errorf("previously seen Bib ID %v was encountered", bibID)
 		}
 		m[bibID] = exlID
 	}
 	err = scanner.Err()
 	if err != nil {
-		return fmt.Errorf("Scanner error when processing %v, %v.\n", absFilePath, err)
+		return fmt.Errorf("scanner error when processing %v, %v", absFilePath, err)
 	}
 	return nil
 }
@@ -345,13 +345,13 @@ func processLine(line string) (bibID uint32, exlID uint64, _ error) {
 	// Split the input line into fields on commas.
 	splitLine := strings.Split(line, ",")
 	if len(splitLine) < 2 {
-		return bibID, exlID, fmt.Errorf("Line has incorrect number of fields, 2 expected, %v found.\n", len(splitLine))
+		return bibID, exlID, fmt.Errorf("line has incorrect number of fields, 2 expected, %v found", len(splitLine))
 	}
 	// The bibIDs look like this: a1234-instid
 	// We need to strip off the first character and anything after the dash.
 	dashIndex := strings.Index(splitLine[1], "-")
 	if (dashIndex == 0) || (dashIndex == 1) {
-		return bibID, exlID, fmt.Errorf("No bibID number was found before dash between bibID and institution id.\n")
+		return bibID, exlID, fmt.Errorf("no bibID number was found before dash between bibID and institution id")
 	}
 	bibIDString := "invalid"
 	// If the dash isn't found, use the whole bibID field except the first character.

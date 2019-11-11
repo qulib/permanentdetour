@@ -30,29 +30,26 @@ const (
 	// PrimoDomain is the domain at which Primo instances are hosted.
 	PrimoDomain string = "primo.exlibrisgroup.com"
 
+	// subDomain is the institution domain
+        subDomain string = "ocul-qu"
+
+	// instVID is the institution vid
+	instVID string = "01OCUL_QU:QU_DEFAULT"
+
 	// MaxMappingFileLength is the maximum number of lines in a mapping file.
 	MaxMappingFileLength uint64 = 1000000
 
-	// RecordURLPrefix is the prefix of the path of requests to III catalogues for the permalink of a record.
-	RecordPrefix string = "/record=b"
+	// RecordURLPrefix is the prefix of the path of requests to catalogues for the permalink of a record.
+	RecordPrefix string = "/vwebv/holdingsInfo"
 
-	// PatronInfoPrefix is the prefix of the path of requests to III catalogues for the patron login form.
-	PatronInfoPrefix string = "/patroninfo"
+	// PatronInfoPrefix is the prefix of the path of requests to catalogues for the patron login form.
+	PatronInfoPrefix2 string = "/vwebv/login"
 
-	// SearchAuthorIndexPrefix is the prefix of the path of requests to III catalogues for the author search.
-	SearchAuthorIndexPrefix string = "/search/a"
+	// PatronInfoPrefix is the prefix of the path of requests to catalogues for the patron login form.
+	PatronInfoPrefix string = "/vwebv/my"
 
-	// SearchPrefix is the prefix of the path of requests to III catalogues for the call number search.
-	SearchCallNumberIndexPrefix string = "/search/c"
-
-	// SearchTitleIndexPrefix is the prefix of the path of requests to III catalogues for the title search.
-	SearchTitleIndexPrefix string = "/search/c"
-
-	// AdvancedSearchPrefix is the prefix of the path of requests to III catalogues for advanced searches.
-	AdvancedSearchPrefix string = "/search/X"
-
-	// SearchPrefix is the prefix of the path of requests to III catalogues for search results.
-	SearchPrefix string = "/search"
+	// SearchPrefix is the prefix of the path of requests to catalogues for search results.
+	SearchPrefix string = "/vwebv/search"
 )
 
 // A version flag, which should be overwritten when building using ldflags.
@@ -60,7 +57,7 @@ var version = "devel"
 
 // Detourer is a struct which stores the data needed to perform redirects.
 type Detourer struct {
-	idMap map[uint32]uint64 // The map of III BibIDs to ExL IDs.
+	idMap map[uint32]uint64 // The map of BibIDs to ExL IDs.
 	primo string            // The domain name (host) for the target Primo instance.
 	vid   string            // The vid parameter to use when building Primo URLs.
 }
@@ -76,20 +73,13 @@ func (d Detourer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// Depending on the prefix...
 	switch {
-	case strings.HasPrefix(r.URL.Path, RecordPrefix):
+	  case strings.HasPrefix(r.URL.Path, RecordPrefix):
 		buildRecordRedirect(redirectTo, r, d.idMap)
-	case strings.HasPrefix(r.URL.Path, PatronInfoPrefix):
+	  case strings.HasPrefix(r.URL.Path, PatronInfoPrefix):
 		redirectTo.Path = "/discovery/login"
-	case strings.HasPrefix(r.URL.Path, SearchAuthorIndexPrefix):
-		buildAuthorSearchRedirect(redirectTo, r)
-	case strings.HasPrefix(r.URL.Path, SearchCallNumberIndexPrefix):
-		buildCallNumberSearchRedirect(redirectTo, r)
-	case strings.HasPrefix(r.URL.Path, SearchTitleIndexPrefix):
-		buildTitleSearchRedirect(redirectTo, r)
-	case strings.HasPrefix(r.URL.Path, AdvancedSearchPrefix):
-		setParamInURL(redirectTo, "mode", "advanced")
-		buildSearchRedirect(redirectTo, r)
-	case strings.HasPrefix(r.URL.Path, SearchPrefix):
+	  case strings.HasPrefix(r.URL.Path, PatronInfoPrefix2):
+		redirectTo.Path = "/discovery/login"
+	  case strings.HasPrefix(r.URL.Path, SearchPrefix):
 		buildSearchRedirect(redirectTo, r)
 	}
 
@@ -97,117 +87,63 @@ func (d Detourer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	setParamInURL(redirectTo, "vid", d.vid)
 
 	// Send the redirect to the client.
-	http.Redirect(w, r, redirectTo.String(), http.StatusMovedPermanently)
+	// http.Redirect(w, r, redirectTo.String(), http.StatusMovedPermanently)
+	http.Redirect(w, r, redirectTo.String(), http.StatusTemporaryRedirect)
 }
 
 // buildRecordRedirect updates redirectTo to the correct Primo record URL for the requested bibID.
 func buildRecordRedirect(redirectTo *url.URL, r *http.Request, idMap map[uint32]uint64) {
-	// Convert everything after the RecordPrefix to a integer.
-	bibID64, err := strconv.ParseUint(r.URL.Path[len(RecordPrefix):], 10, 32)
+	q := r.URL.Query()
+	// bibID64, err := strconv.ParseUint(r.URL.Path[len(RecordPrefix):], 10, 32)
+	bibID64, err := strconv.ParseUint(q.Get("bibId"), 10, 32)
 	if err == nil {
 		bibID := uint32(bibID64)
 		exlID, present := idMap[bibID]
 		if present {
 			redirectTo.Path = "/discovery/fulldisplay"
 			setParamInURL(redirectTo, "docid", fmt.Sprintf("alma%v", exlID))
+		} else {
+			log.Printf("Not found: %v", bibID64)
 		}
+	} else {
+		log.Fatalln(err)
 	}
 }
 
-// buildAuthorSearchRedirect updates redirectTo to the correct Primo URL for the requested author search.
-func buildAuthorSearchRedirect(redirectTo *url.URL, r *http.Request) {
-	redirectTo.Path = "/discovery/browse"
-	setParamInURL(redirectTo, "browseScope", "author")
-	q := r.URL.Query()
-	searchParam := q.Get("SEARCH")
-	if searchParam != "" {
-		setParamInURL(redirectTo, "browseQuery", searchParam)
-	}
-}
-
-// buildCallNumberSearchRedirect updates redirectTo to the correct Primo URL for the requested call number search.
-func buildCallNumberSearchRedirect(redirectTo *url.URL, r *http.Request) {
-	redirectTo.Path = "/discovery/browse"
-	setParamInURL(redirectTo, "browseScope", "callnumber.0")
-	q := r.URL.Query()
-	searchParam := q.Get("SEARCH")
-	if searchParam != "" {
-		setParamInURL(redirectTo, "browseQuery", searchParam)
-	}
-}
-
-// buildTitleSearchRedirect updates redirectTo to the correct Primo URL for the requested title search.
-func buildTitleSearchRedirect(redirectTo *url.URL, r *http.Request) {
-	redirectTo.Path = "/discovery/browse"
-	setParamInURL(redirectTo, "browseScope", "title")
-	q := r.URL.Query()
-	searchParam := q.Get("SEARCH")
-	if searchParam != "" {
-		setParamInURL(redirectTo, "browseQuery", searchParam)
-	}
-}
+// SearchAuthorIndexPrefix string = "/vwebv/search?searchArg=XXX&searchCode=NAME"
+// SearchCallNumberIndexPrefix string = "/vwebv/search?searchArg=XXX&searchCode=CALL"
+// SearchTitleIndexPrefix string = "/vwebv/search?searchArg=XXX&searchCode=T"
+// SearchJournalIndexPrefix string = "/vwebv/search?searchArg=XXX&searchCode=JALL"
 
 // buildSearchRedirect updates redirectTo to an approximate Primo URL for the requested search.
 func buildSearchRedirect(redirectTo *url.URL, r *http.Request) {
 	q := r.URL.Query()
 
-	// Sort
-	switch q.Get("sortdropdown") {
-	case "t":
-		setParamInURL(redirectTo, "sortby", "title")
-	case "a":
-		setParamInURL(redirectTo, "sortby", "author")
-	case "c":
-		setParamInURL(redirectTo, "sortby", "date_a")
-	case "r":
-		setParamInURL(redirectTo, "sortby", "date_d")
-	}
-
-	// Filter
-	switch q.Get("searchscope") {
-	case "1":
-		setParamInURL(redirectTo, "mfacet", "rtype,include,books,1")
-	case "2":
-		setParamInURL(redirectTo, "mfacet", "rtype,include,journals,1")
-	case "3":
-		setParamInURL(redirectTo, "mfacet", "rtype,include,books,1")
-		addParamInURL(redirectTo, "mfacet", "rtype,include,online_resources,2")
-	case "4":
-		setParamInURL(redirectTo, "mfacet", "rtype,include,journals,1")
-		addParamInURL(redirectTo, "mfacet", "rtype,include,online_resources,2")
-	case "5":
-		setParamInURL(redirectTo, "mfacet", "rtype,include,online_resources,1")
-	case "6":
-		setParamInURL(redirectTo, "mfacet", "rtype,include,government_documents,1")
-	case "7":
-		setParamInURL(redirectTo, "mfacet", "rtype,include,audios,1")
-	case "8":
-		setParamInURL(redirectTo, "mfacet", "rype,include,videos,1")
-	}
-
 	setParamInURL(redirectTo, "tab", "Everything")
 	setParamInURL(redirectTo, "search_scope", "MyInst_and_CI")
 
-	if q.Get("searcharg") != "" {
-		switch q.Get("searchtype") {
-		case "t":
-			setParamInURL(redirectTo, "query", fmt.Sprintf("title,contains,%v", q.Get("searcharg")))
-		case "a":
-			setParamInURL(redirectTo, "query", fmt.Sprintf("creator,contains,%v", q.Get("searcharg")))
-		case "d":
-			setParamInURL(redirectTo, "query", fmt.Sprintf("sub,contains,%v", q.Get("searcharg")))
-		case "c":
+	if q.Get("searchArg") != "" {
+		switch q.Get("searchCode") {
+		case "TKEY^":
+			setParamInURL(redirectTo, "query", fmt.Sprintf("title,contains,%v", q.Get("searchArg")))
+		case "TALL":
+			setParamInURL(redirectTo, "query", fmt.Sprintf("title,contains,%v", q.Get("searchArg")))
+		case "NAME":
+			redirectTo.Path = "/discovery/browse"
+			setParamInURL(redirectTo, "browseScope", "author")
+			setParamInURL(redirectTo, "browseQuery", q.Get("searchArg"))
+		case "CALL":
 			redirectTo.Path = "/discovery/browse"
 			setParamInURL(redirectTo, "browseScope", "callnumber.0")
-			setParamInURL(redirectTo, "browseQuery", q.Get("searcharg"))
-		case "X":
-			setParamInURL(redirectTo, "mode", "advanced")
-			setParamInURL(redirectTo, "query", fmt.Sprintf("any,contains,%v", q.Get("searcharg")))
+			setParamInURL(redirectTo, "browseQuery", q.Get("searchArg"))
+		case "JALL":
+			redirectTo.Path = "/discovery/jsearch"
+			setParamInURL(redirectTo, "tab", "jsearch_slot")
+			setParamInURL(redirectTo, "query", fmt.Sprintf("any,contains,%v", q.Get("searchArg")))
 		default:
-			setParamInURL(redirectTo, "query", fmt.Sprintf("any,contains,%v", q.Get("searcharg")))
+			setParamInURL(redirectTo, "query", fmt.Sprintf("any,contains,%v", q.Get("searchArg")))
 		}
 	} else if q.Get("SEARCH") != "" {
-		setParamInURL(redirectTo, "mode", "advanced")
 		setParamInURL(redirectTo, "query", fmt.Sprintf("any,contains,%v", q.Get("SEARCH")))
 	}
 }
@@ -216,8 +152,8 @@ func main() {
 
 	// Define the command line flags.
 	addr := flag.String("address", DefaultAddress, "Address to bind on.")
-	subdomain := flag.String("primo", "", "The subdomain of the target Primo instance, ?????.primo.exlibrisgroup.com. Required.")
-	vid := flag.String("vid", "", "VID parameter for Primo. Required.")
+	subdomain := flag.String("primo", subDomain, "The subdomain of the target Primo instance, ?????.primo.exlibrisgroup.com.")
+	vid := flag.String("vid", instVID, "VID parameter for Primo.")
 
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Permanent Detour: A tiny web service which redirects Sierra Web OPAC requests to Primo URLs.\n")
@@ -242,20 +178,13 @@ func main() {
 		log.Fatalln(err)
 	}
 
-	if *subdomain == "" {
-		log.Fatalln("A primo subdomain is required.")
-	}
-	if *vid == "" {
-		log.Fatalln("A vid is required.")
-	}
-
 	// The Detourer has all the data needed to build redirects.
 	d := Detourer{
 		primo: fmt.Sprintf("%v.%v", *subdomain, PrimoDomain),
 		vid:   *vid,
-	}
+        }
 
-	// Map of III BibIDs to ExL IDs
+	// Map of BibIDs to ExL IDs
 	// The initial size is an estimate based on the number of arguments.
 	size := uint64(len(flag.Args())) * MaxMappingFileLength
 	d.idMap = make(map[uint32]uint64, size)
@@ -269,7 +198,7 @@ func main() {
 		}
 	}
 
-	log.Printf("%v III BibID to Ex Libris ID mappings processed.\n", len(d.idMap))
+	log.Printf("%v VGer BibID to Ex Libris ID mappings processed.\n", len(d.idMap))
 
 	// Use an explicit request multiplexer.
 	mux := http.NewServeMux()
@@ -340,7 +269,7 @@ func processFile(m map[uint32]uint64, mappingFilePath string) error {
 	return nil
 }
 
-// processLine takes a line of input, and finds the III bib ID and the exL ID.
+// processLine takes a line of input, and finds the bibID and the exL ID.
 func processLine(line string) (bibID uint32, exlID uint64, _ error) {
 	// Split the input line into fields on commas.
 	splitLine := strings.Split(line, ",")
@@ -356,9 +285,9 @@ func processLine(line string) (bibID uint32, exlID uint64, _ error) {
 	bibIDString := "invalid"
 	// If the dash isn't found, use the whole bibID field except the first character.
 	if dashIndex == -1 {
-		bibIDString = splitLine[1][1:]
+		bibIDString = splitLine[1]
 	} else {
-		bibIDString = splitLine[1][1:dashIndex]
+		bibIDString = splitLine[1][0:dashIndex]
 	}
 	bibID64, err := strconv.ParseUint(bibIDString, 10, 32)
 	if err != nil {

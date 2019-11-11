@@ -156,7 +156,7 @@ func main() {
 	vid := flag.String("vid", instVID, "VID parameter for Primo.")
 
 	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, "Permanent Detour: A tiny web service which redirects Sierra Web OPAC requests to Primo URLs.\n")
+		fmt.Fprintf(os.Stderr, "Permanent Detour: A tiny web service which redirects Voyager Web OPAC requests to Primo URLs.\n")
 		fmt.Fprintf(os.Stderr, "Version %v\n", version)
 		fmt.Fprintf(os.Stderr, "Usage: permanentdetour [flag...] [file...]\n")
 		flag.PrintDefaults()
